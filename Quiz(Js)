@@ -1,0 +1,10 @@
+function doPost(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Results');
+  sheet.appendRow([
+    e.parameter.timestamp,
+    e.parameter.name,
+    e.parameter.score,
+    e.parameter.total
+  ]);
+  return ContentService.createTextOutput('OK');
+}

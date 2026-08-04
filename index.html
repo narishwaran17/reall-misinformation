@@ -152,6 +152,16 @@
   .quiz-result{display:none; text-align:center;}
   .quiz-result .big{font-family:'Fraunces',serif; font-size:3rem; color:var(--amber);}
 
+  /* NAME FIELD */
+  .quiz-name{display:flex; flex-direction:column; gap:8px; margin-bottom:22px;}
+  .quiz-name label{font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--paper-dim); text-transform:uppercase; letter-spacing:0.06em;}
+  .quiz-name input{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:3px; padding:12px 14px;
+    color:var(--paper); font-family:'IBM Plex Sans',sans-serif; font-size:0.95rem;
+  }
+  .quiz-name input:focus{outline:none; border-color:var(--signal);}
+  .quiz-submit-status{font-family:'IBM Plex Mono',monospace; font-size:0.78rem; color:var(--paper-dim); margin-top:14px; min-height:16px;}
+
   /* REFERENCES */
   .ref-list{border-top:1px solid var(--line);}
   .ref-item{padding:18px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap;}
@@ -308,11 +318,16 @@
       <p>Six scenarios. Decide which category fits before reading on.</p>
     </div>
     <div class="quiz-box">
+      <div class="quiz-name" id="quizNameField">
+        <label for="quizNameInput">Your name (optional, saved to the results sheet)</label>
+        <input type="text" id="quizNameInput" placeholder="e.g. Alex Tan" maxlength="60">
+      </div>
       <div class="quiz-progress" id="quizProgress"></div>
       <div id="quizBody"></div>
       <div class="quiz-result" id="quizResult">
         <div class="big" id="quizScoreBig">0/6</div>
         <p style="color:var(--paper-dim); margin-top:8px;">Correct answers</p>
+        <div class="quiz-submit-status" id="quizSubmitStatus"></div>
         <a href="#" class="btn btn-ghost" style="margin-top:22px;" id="quizRestart">Try again</a>
       </div>
     </div>
@@ -387,6 +402,34 @@
 <footer>SIGNAL / NOISE — a student project on information disorder</footer>
 
 <script>
+// ---- Google Sheet logging endpoint (Apps Script Web App) ----
+const SHEET_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzhoYXa-CxLI7iDPR255xxbwYp7J-HerGM6OnraUl3QoqAmyo6z6QMlORVTBrIG-TRc/exec";
+
+function submitQuizResultToSheet(name, score, total){
+  const statusEl = document.getElementById('quizSubmitStatus');
+  if(statusEl) statusEl.innerText = "Saving your result…";
+
+  const payload = new URLSearchParams();
+  payload.append('name', name || 'Anonymous');
+  payload.append('score', score);
+  payload.append('total', total);
+  payload.append('timestamp', new Date().toISOString());
+
+  fetch(SHEET_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors', // Apps Script web apps don't return CORS headers, so the response is opaque
+    body: payload
+  })
+  .then(()=>{
+    // 'no-cors' means we can't read the actual response, so we optimistically assume success
+    if(statusEl) statusEl.innerText = "Saved to results sheet ✓";
+  })
+  .catch(err=>{
+    console.error('Could not log quiz result:', err);
+    if(statusEl) statusEl.innerText = "Couldn't save your result — check your connection.";
+  });
+}
+
 // ---- Hero scramble ----
 const words = ["noise","claim","clip","post","headline"];
 let wi = 0;
@@ -505,8 +548,13 @@ function renderProgress(){
 function renderQuestion(){
   if(qIndex >= quizData.length){
     quizBody.style.display='none';
+    document.getElementById('quizNameField').style.display='none';
     quizResult.style.display='block';
     document.getElementById('quizScoreBig').innerText = score + '/' + quizData.length;
+
+    // Log the result to the linked Google Sheet
+    const nameVal = document.getElementById('quizNameInput').value.trim();
+    submitQuizResultToSheet(nameVal, score, quizData.length);
     return;
   }
   quizBody.style.display='block';
@@ -550,6 +598,9 @@ renderQuestion();
 document.getElementById('quizRestart').addEventListener('click', (e)=>{
   e.preventDefault();
   qIndex = 0; score = 0;
+  document.getElementById('quizNameField').style.display='flex';
+  document.getElementById('quizSubmitStatus').innerText = '';
+  document.getElementById('quizNameInput').value = '';
   renderQuestion();
 });
 </script>
